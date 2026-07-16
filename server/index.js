@@ -7,6 +7,7 @@ app.use(cors({
     origin: 'http://localhost:5173'
 })); 
 
+
 app.get('/api/hello', (req, res) => {
     res.json({ message: 'hello from server' });
 });
