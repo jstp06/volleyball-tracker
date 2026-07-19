@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 
 function Scorekeeper({ set, onBack }) {
     const [players, setPlayers] = useState([]);
@@ -6,6 +7,22 @@ function Scorekeeper({ set, onBack }) {
     const [team, setTeam] = useState('us');
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [actionType, setActionType] = useState('attack');
+
+    useEffect(() => {
+        const socket = io('http://localhost:3001');
+
+        socket.emit('join-set', currentSet.id);
+
+        socket.on('score-updated', (data) => {
+            if (data.setId === currentSet.id) {
+                refreshSet();
+            }
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, [currentSet.id]);
 
     useEffect(() => {
         fetch(`http://localhost:3001/api/players`)

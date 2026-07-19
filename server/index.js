@@ -1,14 +1,37 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
+const pool = require('./db');
+
 const app = express();
 const PORT = 3001; 
-const pool = require('./db');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: 'http://localhost:5173'
+    }
+});
 
 app.use(cors({
     origin: 'http://localhost:5173'
 })); 
 
 app.use(express.json()); //allows express to read the body of incoming requests 
+
+io.on('connection', (socket) => {
+    console.log('A client connected:', socket.id);
+
+    socket.on('join-set', (setId) => {
+        socket.join(`set-${setId}`);
+        console.log(`Socket ${socket.id} joined set-${setId}`);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('A client disconnected:', socket.id);
+    });
+});
 
 app.get('/api/matches', async (req, res) => {
     try {
@@ -132,6 +155,9 @@ app.post('/api/sets/:setId/actions', async (req, res) => {
     }
 }
 
+    io.to(`set-${setId}`).emit('score-updated', {
+        setId: parseInt(setId)
+    });
 
     res.status(201).json(actionRow.rows[0]);
     } catch (err) {
@@ -297,6 +323,6 @@ app.get('/api/hello', (req, res) => { //test
     res.json({ message: 'hello from server' });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log('Server running on http://localhost:${PORT}');
 });

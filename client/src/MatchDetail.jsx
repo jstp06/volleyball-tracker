@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import Scorekeeper from './Scorekeeper';
+import Viewer from './Viewer';
 
 function MatchDetail({ match, onBack }) {
     const [sets, setSets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedSet, setSelectedSet] = useState(null);
+    const [mode, setMode] = useState(null);
 
     useEffect(() => {
         fetch(`http://localhost:3001/api/matches/${match.id}/sets`)
@@ -23,11 +25,26 @@ function MatchDetail({ match, onBack }) {
         return <p>Loading sets...</p>;
     }
 
-    if (selectedSet) {
+    if (selectedSet && mode === 'scorekeeper') {
         return (
             <Scorekeeper
                 set={selectedSet}
-                onBack={() => setSelectedSet(null)}
+                onBack={() => {
+                    setSelectedSet(null);
+                    setMode(null);
+                }}
+            />
+        );
+    }
+
+    if (selectedSet && mode === 'viewer') {
+        return (
+            <Viewer
+                set={selectedSet}
+                onBack={() => {
+                    setSelectedSet(null);
+                    setMode(null);
+                }}
             />
         );
     }
@@ -41,12 +58,18 @@ function MatchDetail({ match, onBack }) {
         <h2>Sets</h2>
         <ul>
             {sets.map((set) => (
-                <li key={set.id} onClick={() => setSelectedSet(set)}>
+                <li key={set.id}>
                     Set{set.set_number}: {set.our_score} - {set.opponent_score} ({set.status})
+                    <button onClick={() => { setSelectedSet(set); setMode('scorekeeper'); }}>
+                        Score
+                    </button>
+                    <button onClick={() => { setSelectedSet(set); setMode('viewer'); }}>
+                        View
+                    </button>
                 </li>
             ))}
         </ul>
-         </div>
+    </div>
     );
 }
 
