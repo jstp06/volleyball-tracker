@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import Scorekeeper from './Scorekeeper';
 
 function MatchDetail({ match, onBack }) {
     const [sets, setSets] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedSet, setSelectedSet] = useState(null);
 
     useEffect(() => {
         fetch(`http://localhost:3001/api/matches/${match.id}/sets`)
@@ -21,6 +23,15 @@ function MatchDetail({ match, onBack }) {
         return <p>Loading sets...</p>;
     }
 
+    if (selectedSet) {
+        return (
+            <Scorekeeper
+                set={selectedSet}
+                onBack={() => setSelectedSet(null)}
+            />
+        );
+    }
+
     return (
         <div>
             <button onClick={onBack}>← Back to matches</button>
@@ -30,7 +41,7 @@ function MatchDetail({ match, onBack }) {
         <h2>Sets</h2>
         <ul>
             {sets.map((set) => (
-                <li key={set.id}>
+                <li key={set.id} onClick={() => setSelectedSet(set)}>
                     Set{set.set_number}: {set.our_score} - {set.opponent_score} ({set.status})
                 </li>
             ))}
