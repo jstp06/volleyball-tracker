@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import MatchDetail from './MatchDetail';
+import Players from './Players';
 
 function App() {
   const [matches, setMatches] = useState([]);
@@ -8,6 +9,7 @@ function App() {
   const [opponent, setOpponent] = useState('');
   const [date, setDate] = useState('');
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [showPlayers, setShowPlayers] = useState(false);
 
   useEffect(() => {
     fetch('http://localhost:3001/api/matches')
@@ -54,17 +56,24 @@ function App() {
     );
   }
 
+  if (showPlayers) {
+    return <Players onBack={() => setShowPlayers(false)} />;
+  }
+
   return (
     <div>
       <h1>Volleyball Tracker</h1>
+
+      <button onClick={() => setShowPlayers(true)}>Manage Roster</button>
+
       <h2>Matches</h2>
-      <u1>
+      <ul>
         {matches.map((match) => (
           <li key = {match.id} onClick={() => setSelectedMatch(match)}>
             {match.opponent} - {new Date(match.date).toLocaleDateString()} - {match.status}
           </li>
         ))}
-      </u1>
+      </ul>
 
       <h2>Create a Match</h2>
       <form onSubmit={handleCreateMatch}>
@@ -83,6 +92,7 @@ function App() {
       </form>
     </div>
   );
+
 }
 
 export default App
