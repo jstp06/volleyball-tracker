@@ -6,6 +6,7 @@ function Players({ onBack}) {
     const [name, setName] = useState('');
     const [jerseyNumber, setJerseyNumber] = useState('');
     const [position, setPosition] = useState('');
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         fetch('http://localhost:3001/api/players')
@@ -16,6 +17,7 @@ function Players({ onBack}) {
         })
         .catch((err) => {
             console.error(err);
+            setError('Could not load players. Is the server running?');
             setLoading(false);
         });
     }, []);
@@ -33,6 +35,11 @@ function Players({ onBack}) {
                     position
                 })
             });
+
+            if (!response.ok) {
+                throw new Error('Failed to add player');
+            }
+
             const newPlayer = await response.json();
 
             setPlayers([...players, newPlayer]);
@@ -41,6 +48,7 @@ function Players({ onBack}) {
             setPosition('');
         } catch (err) {
             console.error(err);
+            setError('Could not add player. Please try again.')
         }   
     };
 
@@ -50,6 +58,7 @@ function Players({ onBack}) {
 
     return (
         <div>
+            {error && <p style={{ color: 'red' }}>{error}</p>}
             <button onClick={onBack}>← Back to matches</button>
             <h1>Roster</h1>
 

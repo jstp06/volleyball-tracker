@@ -7,6 +7,25 @@ function Scorekeeper({ set, onBack }) {
     const [team, setTeam] = useState('us');
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [actionType, setActionType] = useState('attack');
+    const [matchStatus, setMatchStatus] = useState(null);
+    const [error, setError] = useState(null);
+
+    const fetchMatchStatus = async () => {
+        try {
+            const response = await fetch('http://localhost:3001/api/matches');
+            const data = await response.json();
+            const thisMatch = data.find((m) => m.id ===currentSet.match_id);
+            if (thisMatch) {
+                setMatchStatus(thisMatch.status);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    useEffect(() => {
+        fetchMatchStatus();
+    }, [currentSet.match_id]);
 
     useEffect(() => {
         const socket = io('http://localhost:3001');
@@ -45,8 +64,11 @@ function Scorekeeper({ set, onBack }) {
     };
 
     const logAction = async (result) => {
+        if (matchStatus === 'completed' || currentSet.status === 'completed') {
+            return;
+        }
         try {
-            await fetch(`http://localhost:3001/api/sets/${currentSet.id}/actions`, {
+            const response = await fetch(`http://localhost:3001/api/sets/${currentSet.id}/actions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -56,18 +78,56 @@ function Scorekeeper({ set, onBack }) {
                     result
                 })
             });
+
+            if (!response.ok) {
+                throw new Error('Failed to log action');
+            }
+
             await refreshSet();
+            await fetchMatchStatus();
+            setError(null);
         } catch(err) {
                 console.error(err);
+                setError('Could not log that action. Please try again');
+            }
+        };
+
+        const undoLastAction = async () => {
+            try {
+                const response = await fetch(`http://localhost:3001/api/sets/${currentSet.id}/actions/last`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to undo action');
+                }
+
+                await refreshSet();
+                await fetchMatchStatus();
+                setError(null);
+            } catch (err) {
+                console.error(err);
+                setError('Could not undo. Please try again');
             }
         };
 
         return (
             <div>
+                {error && <p style={{ color: 'red' }}>{error}</p>}
                 <button onClick={onBack}>← Back to sets</button>
                 <h1>Set {currentSet.set_number}</h1>
                 <h2>{currentSet.our_score} - {currentSet.opponent_score}</h2>
                 <p>Status: {currentSet.status}</p>
+                <button onClick={undoLastAction}>Undo Last Action</button>
+
+                {matchStatus === 'completed' || currentSet.status === 'completed' ? (
+                    <p>
+                        {matchStatus === 'completed'
+                        ? 'This match is complete. No further actions can be logged.'
+                        : 'This set is compelte. Not further actions can be logged.'}
+                    </p>
+                ) : (
+                    <>
 
                 <h3>Team</h3>
                 <button onClick={() => setTeam('us')} disabled={team === 'us'}>Us</button>
@@ -76,6 +136,9 @@ function Scorekeeper({ set, onBack }) {
                 {team === 'us' && (
                     <div>
                         <h3>Player</h3>
+                        {players.length === 0 ? (
+                            <p>No players on the roster yet. Add players first.</p>
+                        ) : (
                         <select
                             value={selectedPlayerId}
                             onChange={(e) => setSelectedPlayerId(e.target.value)}
@@ -87,6 +150,7 @@ function Scorekeeper({ set, onBack }) {
                                 </option>
                             ))}
                         </select>
+                        )}
                     </div>
                 )}
 
@@ -117,7 +181,9 @@ function Scorekeeper({ set, onBack }) {
                         <button onClick={() => logAction('in_play')}>In Play</button>
                     </div>
                 )}
-            </div>
+                </>
+            )}
+        </div>
      );
 }
 

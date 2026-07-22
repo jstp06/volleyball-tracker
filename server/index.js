@@ -35,7 +35,7 @@ io.on('connection', (socket) => {
 
 app.get('/api/matches', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM match');
+        const result = await pool.query('SELECT * FROM match ORDER BY date ASC');
         res.json(result.rows);
     } catch (err) {
         console.error(err);
@@ -84,6 +84,16 @@ app.post('/api/matches/:matchId/sets', async (req, res) => {
     try {
         const { matchId } = req.params;
         const { set_number } = req.body;
+
+        const matchCheck = await pool.query('SELECT status FROM match WHERE id = $1', [matchId]);
+
+        if (matchCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Match not found' });
+        }
+
+        if (matchCheck.rows[0].status === 'completed') {
+            return res.status(400).json({ error: 'Cannot create sets on a completed match' });
+        }
         const result = await pool.query(
             'INSERT INTO set (match_id, set_number) VALUES ($1, $2) RETURNING *', [matchId, set_number]
         );
@@ -98,7 +108,7 @@ app.get('/api/matches/:matchId/sets', async (req, res) => {
     try {
         const { matchId } = req.params;
         const result = await pool.query(
-            'SELECT * FROM set WHERE match_id = $1', [matchId]
+            'SELECT * FROM set WHERE match_id = $1 ORDER BY set_number ASC', [matchId]
         );
         res.json(result.rows);
     } catch (err) {
@@ -111,6 +121,19 @@ app.post('/api/sets/:setId/actions', async (req, res) => {
     try {
         const { setId } = req.params;
         const { player_id, team, action_type, result: actionResult } = req.body;
+
+        const setCheck = await pool.query(
+            `SELECT s.id, s.status AS set_status, m.status AS match_status FROM "set" s JOIN match m ON s.match_id = m.id WHERE s.id = $1`,
+            [setId]
+        );
+
+        if (setCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Set not found' });
+        }
+
+        if (setCheck.rows[0].match_status === 'completed') {
+            return res.status(400).json({ error: 'Cannot log actions on a compelted match' });
+        }
 
         const actionRow = await pool.query(
             'INSERT INTO action (set_id, player_id, team, action_type, result) VALUES ($1, $2, $3, $4, $5) RETURNING *', [setId, player_id || null, team, action_type, actionResult]
@@ -319,10 +342,110 @@ app.get('/api/players/:playerId/stats/match/:matchId', async (req, res) => { // 
     }
 });
 
+app.delete('/api/sets/:setId/actions/last', async (req, res) => { //undo button
+    try {
+        const { setId } = req.params;
+
+        const lastActionResult = await pool.query(
+            'SELECT * FROM action WHERE set_id = $1 ORDER BY created_at DESC LIMIT 1',
+            [setId]
+        );
+
+        if (lastActionResult.rowCount === 0) {
+            return res.status(404).json({ error: 'No actions to undo' });
+        }
+
+        const lastAction = lastActionResult.rows[0];
+        const { id: actionId, team, result: actionResult } = lastAction;
+
+        await pool.query('DELETE FROM action WHERE id = $1', [actionId]);
+
+        const scoringResults = ['kill', 'ace', 'block', 'error'];
+        if ( scoringResults.includes(actionResult)) {
+            const errorResults = ['error'];
+            const pointWentToUs = errorResults.includes(actionResult)
+            ? team !== 'us'
+            : team === 'us';
+
+            const scoreColumn = pointWentToUs ? 'our_score' : 'opponent_score';
+
+            const updatedSet = await pool.query(
+                `UPDATE "set" SET ${scoreColumn} = ${scoreColumn} - 1 WHERE id = $1 RETURNING *`,
+                [setId]
+            );
+
+            const { our_score, opponent_score, match_id, status } = updatedSet.rows[0];
+
+            if (status === 'completed') {
+                const scoreDiff = Math.abs(our_score - opponent_score);
+                const stillOver = (our_score >= 25 || opponent_score >= 25) && scoreDiff >= 2;
+
+                if (!stillOver) {
+                    await pool.query(
+                        `UPDATE "set" SET status = 'in_progress' WHERE id = $1`,
+                        [setId]
+                    );
+
+                    const matchColumn = pointWentToUs ? 'our_sets_won' : 'opponent_sets_won';
+                    const updatedMatch = await pool.query(
+                        `UPDATE match SET ${matchColumn} = ${matchColumn} - 1 WHERE id = $1 RETURNING *`,
+                        [match_id]
+                    );
+
+                    if (updatedMatch.rows[0].status === 'completed') {
+                        await pool.query(
+                            `UPDATE match SET status = 'in_progress' WHERE id = $1`,
+                            [match_id]
+                        );
+                    }
+                }
+
+            }
+        }
+        
+        res.json({ undone : lastAction });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Something went wrong' });
+    }
+});
+
+app.delete('/api/sets/:setId', async (req, res) => { //delete set
+    try {
+        const { setId } = req.params;
+
+        await pool.query('DELETE FROM action WHERE set_id = $1', [setId]);
+        await pool.query('DELETE FROM "set" WHERE ID = $1', [setId]);
+
+        res.json({ deleted: true});
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Something went wrong'});
+    }
+});
+
+app.delete('/api/matches/:matchId', async (req, res) => {
+    try {
+        const { matchId } = req.params;
+
+        await pool.query(
+            `DELETE FROM ACTION WHERE set_id IN (SELECT id from "set" WHERE match_id = $1)`,
+            [matchId]
+        );
+        await pool.query('DELETE FROM "set" WHERE match_id = $1', [matchId]);
+        await pool.query('DELETE FROM match WHERE id = $1', [matchId]);
+
+        res.json({ deleted: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Something went wrong' });
+    }
+});
+
 app.get('/api/hello', (req, res) => { //test 
     res.json({ message: 'hello from server' });
 });
 
 server.listen(PORT, () => {
-    console.log('Server running on http://localhost:${PORT}');
+    console.log(`Server running on http://localhost:${PORT}`);
 });
