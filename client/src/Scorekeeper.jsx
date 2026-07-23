@@ -12,9 +12,9 @@ function Scorekeeper({ set, onBack }) {
 
     const fetchMatchStatus = async () => {
         try {
-            const response = await fetch('http://localhost:3001/api/matches');
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matches`);
             const data = await response.json();
-            const thisMatch = data.find((m) => m.id ===currentSet.match_id);
+            const thisMatch = data.find((m) => m.id === currentSet.match_id);
             if (thisMatch) {
                 setMatchStatus(thisMatch.status);
             }
@@ -28,7 +28,7 @@ function Scorekeeper({ set, onBack }) {
     }, [currentSet.match_id]);
 
     useEffect(() => {
-        const socket = io('http://localhost:3001');
+        const socket = io(import.meta.env.VITE_API_URL);
 
         socket.emit('join-set', currentSet.id);
 
@@ -44,7 +44,7 @@ function Scorekeeper({ set, onBack }) {
     }, [currentSet.id]);
 
     useEffect(() => {
-        fetch(`http://localhost:3001/api/players`)
+        fetch(`${import.meta.env.VITE_API_URL}/api/players`)
         .then((res) => res.json())
         .then((data) => setPlayers(data))
         .catch((err) => console.error(err));
@@ -52,7 +52,7 @@ function Scorekeeper({ set, onBack }) {
 
     const refreshSet = async () => {
         try {
-            const response = await fetch(`http://localhost:3001/api/matches/${currentSet.match_id}/sets`);
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matches/${currentSet.match_id}/sets`);
             const allSets = await response.json();
             const updated = allSets.find((s) => s.id === currentSet.id);
             if (updated) {
@@ -68,7 +68,7 @@ function Scorekeeper({ set, onBack }) {
             return;
         }
         try {
-            const response = await fetch(`http://localhost:3001/api/sets/${currentSet.id}/actions`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/sets/${currentSet.id}/actions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -94,7 +94,7 @@ function Scorekeeper({ set, onBack }) {
 
         const undoLastAction = async () => {
             try {
-                const response = await fetch(`http://localhost:3001/api/sets/${currentSet.id}/actions/last`, {
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/sets/${currentSet.id}/actions/last`, {
                     method: 'DELETE'
                 });
 
@@ -111,76 +111,117 @@ function Scorekeeper({ set, onBack }) {
             }
         };
 
-        return (
-            <div>
-                {error && <p style={{ color: 'red' }}>{error}</p>}
-                <button onClick={onBack}>← Back to sets</button>
-                <h1>Set {currentSet.set_number}</h1>
-                <h2>{currentSet.our_score} - {currentSet.opponent_score}</h2>
-                <p>Status: {currentSet.status}</p>
-                <button onClick={undoLastAction}>Undo Last Action</button>
+        const isLocked = matchStatus === 'compelted' || currentSet.status === 'completed';
 
-                {matchStatus === 'completed' || currentSet.status === 'completed' ? (
-                    <p>
+        return (
+            <div className='page'>
+                {error && <p className='error-banner'>{error}</p>}
+                <button className='btn-back' onClick={onBack}>← Back to sets</button>
+                
+                <div className='scoreboard'>
+                    <div className='scoreboard-label'>Set {currentSet.set_number}</div>
+                    <div className='scoreboard-score'>{currentSet.our_score} - {currentSet.opponent_score}</div>
+                    <div className='scoreboard-status'>{currentSet.status}</div>
+                </div>
+                
+                <button className='btn btn-block' onClick={undoLastAction}>Undo Last Action</button>
+
+                {isLocked ? (
+                    <p className='error-banner' style={{ marginTop: 16 }}>
                         {matchStatus === 'completed'
-                        ? 'This match is complete. No further actions can be logged.'
-                        : 'This set is compelte. Not further actions can be logged.'}
+                            ? 'This match is complete. No further actions can be logged.'
+                            : 'This set is compelte. Not further actions can be logged.'}
                     </p>
                 ) : (
                     <>
 
-                <h3>Team</h3>
-                <button onClick={() => setTeam('us')} disabled={team === 'us'}>Us</button>
-                <button onClick={() => setTeam('opponent')} disabled={team === 'opponent'}>Opponent</button>
+                        <h2 className='section-label'>Team</h2>
+                        <div className='btn-group'>
+                            <button 
+                                className={`btn ${team === 'us' ? 'btn-selected' : ''}`} 
+                                onClick={() => setTeam('us')} 
+                                disabled={team === 'us'}
+                            >
+                                Us
+                            </button>
+                            <button 
+                                className={`btn ${team === 'opponent' ? 'btn-selected' : ''}`}
+                                onClick={() => setTeam('opponent')} 
+                                disabled={team === 'opponent'}
+                            >
+                                Opponent
+                            </button>
+                        </div>
 
-                {team === 'us' && (
-                    <div>
-                        <h3>Player</h3>
-                        {players.length === 0 ? (
-                            <p>No players on the roster yet. Add players first.</p>
-                        ) : (
-                        <select
-                            value={selectedPlayerId}
-                            onChange={(e) => setSelectedPlayerId(e.target.value)}
+                        {team === 'us' && (
+                            <div>
+                                <h2 className='section-label'>Player</h2>
+                                {players.length === 0 ? (
+                                    <p className='error-banner'>No players on the roster yet. Add players first.</p>
+                                ) : (
+                                    <select
+                                        className='field'
+                                        value={selectedPlayerId}
+                                        onChange={(e) => setSelectedPlayerId(e.target.value)}
+                                    >
+                                        <option value="">Select a player</option>
+                                        {players.map((player) => (
+                                            <option key={player.id} value ={player.id}>
+                                                #{player.jersey_number ?? '-'} {player.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                        </div>
+                    )}
+
+                    <h2 className='section-label'>Action Type</h2>
+                    <div className='btn-group'>
+                        <button 
+                            className={`btn ${actionType === 'attack' ? 'btn-selected' : ''}`} 
+                            onClick={() => setActionType('attack')} 
+                            disabled={actionType === 'attack'}
                         >
-                            <option value="">Select a player</option>
-                            {players.map((player) => (
-                                <option key={player.id} value ={player.id}>
-                                    #{player.jersey_number ?? '-'} {player.name}
-                                </option>
-                            ))}
-                        </select>
-                        )}
+                            Attack
+                        </button>
+                        <button 
+                            className={`btn ${actionType === 'serve' ? 'btn-selected' : ''}`} 
+                            onClick={() => setActionType('serve')} 
+                            disabled={actionType === 'serve'}
+                        >
+                            Serve
+                        </button>
+                        <button 
+                            className={`btn ${actionType === 'block' ? 'btn-selected' : ''}`} 
+                            onClick={() => setActionType('block')} 
+                            disabled={actionType === 'block'}
+                        >
+                            Block
+                        </button>
                     </div>
-                )}
 
-                <h3>Action Type</h3>
-                <button onClick={() => setActionType('attack')} disabled={actionType === 'attack'}>Attack</button>
-                <button onClick={() => setActionType('serve')} disabled={actionType === 'serve'}>Serve</button>
-                <button onClick={() => setActionType('block')} disabled={actionType === 'block'}>Block</button>
-
-                <h3>Result</h3>
-                {actionType === 'attack' && (
-                    <div>
-                        <button onClick={() => logAction('kill')}>Kill</button>
-                        <button onClick={() => logAction('error')}>Error</button>
-                        <button onClick={() => logAction('in_play')}>In Play</button>
+                    <h2 className='section-label'>Result</h2>
+                    {actionType === 'attack' && (
+                        <div className='btn-group'>
+                            <button className='btn btn-primary' onClick={() => logAction('kill')}>Kill</button>
+                            <button className='btn btn-danger' onClick={() => logAction('error')}>Error</button>
+                            <button className='btn' onClick={() => logAction('in_play')}>In Play</button>
                     </div>
-                )}
-                {actionType === 'serve' && (
-                    <div>
-                        <button onClick={() => logAction('ace')}>Ace</button>
-                        <button onClick={() => logAction('error')}>Error</button>
-                        <button onClick={() => logAction('in_play')}>In Play</button>
-                    </div>
-                )}
-                {actionType === 'block' && (
-                    <div>
-                        <button onClick={() => logAction('block')}>Block</button>
-                        <button onClick={() => logAction('error')}>Error</button>
-                        <button onClick={() => logAction('in_play')}>In Play</button>
-                    </div>
-                )}
+                    )}
+                    {actionType === 'serve' && (
+                        <div className='btn-group'>
+                            <button className='btn btn-primary' onClick={() => logAction('ace')}>Ace</button>
+                            <button className='btn btn-danger' onClick={() => logAction('error')}>Error</button>
+                            <button className='btn' onClick={() => logAction('in_play')}>In Play</button>
+                        </div>
+                    )}
+                    {actionType === 'block' && (
+                        <div className='btn-group'>
+                            <button className='btn btn-primary' onClick={() => logAction('block')}>Block</button>
+                            <button className='btn btn-danger' onClick={() => logAction('error')}>Error</button>
+                            <button className='btn' onClick={() => logAction('in_play')}>In Play</button>
+                        </div>
+                    )}
                 </>
             )}
         </div>

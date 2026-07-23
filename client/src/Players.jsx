@@ -9,7 +9,7 @@ function Players({ onBack}) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetch('http://localhost:3001/api/players')
+        fetch(`${import.meta.env.VITE_API_URL}/api/players`)
         .then((res) => res.json())
         .then((data) => {
             setPlayers(data);
@@ -26,7 +26,7 @@ function Players({ onBack}) {
         e.preventDefault();
 
         try {
-            const response = await fetch('http://localhost:3001/api/players', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/players`, {
                 method: 'POST',
                 headers: { 'Content-Type' : 'application/json' },
                 body: JSON.stringify({
@@ -53,44 +53,50 @@ function Players({ onBack}) {
     };
 
     if (loading) {
-        return <p>Loading players...</p>;
+        return <p className='page'>Loading players...</p>;
     }
 
     return (
-        <div>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            <button onClick={onBack}>← Back to matches</button>
-            <h1>Roster</h1>
+        <div className='page'>
+            {error && <p className='error-banner'>{error}</p>}
+            <button className='btn-back' onClick={onBack}>← Back to matches</button>
+            <h1 className='app-title'>Roster</h1>
 
-            <ul>
+            <div>
                 {players.map((player) => (
-                    <li key={player.id}>
-                        #{player.jersey_number ?? '-'} {player.name} - {player.position ?? 'No position set'}
-                    </li>
+                    <div key={player.id} className='card'>
+                        <div className='card-main'>
+                            <div className='card-title'>#{player.jersey_number ?? '-'} {player.name}</div>
+                            <div className='card-sub'>{player.position ?? 'No position set'}</div>
+                        </div>
+                    </div>
                 ))}
-            </ul>
+            </div>
 
-            <h2>Add a Player</h2>
+            <h2 className='section-label'>Add a Player</h2>
             <form onSubmit={handleAddPlayer}>
                 <input 
+                    className='field'
                     type="text"
                     placeholder="Name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    />
+                />
                 <input
+                    className='field'
                     type="number"
                     placeholder="Jersey #"
                     value={jerseyNumber}
                     onChange={(e) => setJerseyNumber(e.target.value)}
                 />
                 <input
+                    className='field'
                     type="text"
                     placeholder="Position"
                     value={position}
                     onChange={(e) => setPosition(e.target.value)}
                 />
-                <button type="submit">Add Player</button>
+                <button className='btn btn-primary btn-block' type="submit">Add Player</button>
             </form>
         </div>
     );

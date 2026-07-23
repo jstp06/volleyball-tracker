@@ -10,12 +10,12 @@ const PORT = 3001;
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: 'http://localhost:5173'
+        origin: process.env.CLIENT_URL
     }
 });
 
 app.use(cors({
-    origin: 'http://localhost:5173'
+    origin: process.env.CLIENT_URL
 })); 
 
 app.use(express.json()); //allows express to read the body of incoming requests 
@@ -59,7 +59,7 @@ app.post('/api/matches', async (req, res) => {
 
 app.get('/api/players', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM player');
+        const result = await pool.query('SELECT * FROM player ORDER BY jersey_number ASC NULLS LAST');
         res.json(result.rows);
     } catch (err) {
         console.error(err);

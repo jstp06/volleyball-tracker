@@ -6,7 +6,7 @@ function Viewer({ set, onBack }) {
 
     const refreshSet = async () => {
         try {
-            const response = await fetch(`http://localhost:3001/api/matches/${currentSet.match_id}/sets`);
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matches/${currentSet.match_id}/sets`);
             const allSets = await response.json();
             const updated = allSets.find((s) => s.id === currentSet.id);
             if (updated) {
@@ -18,7 +18,7 @@ function Viewer({ set, onBack }) {
     };
 
     useEffect(() => {
-        const socket = io('http://localhost:3001');
+        const socket = io(import.meta.env.VITE_API_URL);
 
         socket.emit('join-set', currentSet.id);
 
@@ -34,13 +34,15 @@ function Viewer({ set, onBack }) {
     }, [currentSet.id]);
 
     return (
-        <div>
-            <button onClick={onBack}>← Back</button>
-            <h1>Set {currentSet.set_number}</h1>
-            <h2 style={{ fontSize: '4rem' }}>
-                {currentSet.our_score} - {currentSet.opponent_score}
-            </h2>
-            <p>Status: {currentSet.status}</p>
+        <div className='page'>
+            <button className='btn-back' onClick={onBack}>← Back</button>
+            <div className='scoreboard'>
+                <div className='scoreboard-label'>Set {currentSet.set_number}</div>
+                <div className='scoreboard-score' style={{ fontSize: '5rem' }}>
+                    {currentSet.our_score} - {currentSet.opponent_score}
+                </div>
+                <div className='scoreboard-status'>{currentSet.status}</div>
+            </div>
         </div>
     );
 }

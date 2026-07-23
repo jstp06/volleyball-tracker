@@ -13,7 +13,7 @@ function MatchDetail({ match, onBack }) {
 
     const refreshMatch = async () => {
         try {
-            const response = await fetch('http://localhost:3001/api/matches');
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matches`);
             const data = await response.json();
             const updated = data.find((m) => m.id === currentMatch.id);
             if (updated) {
@@ -26,7 +26,7 @@ function MatchDetail({ match, onBack }) {
 
     const fetchSets = async () => {
         try {
-            const response = await fetch(`http://localhost:3001/api/matches/${currentMatch.id}/sets`);
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matches/${currentMatch.id}/sets`);
             const data = await response.json();
             setSets(data);
             setLoading(false);
@@ -41,7 +41,7 @@ function MatchDetail({ match, onBack }) {
     }, [currentMatch.id]);
 
     if (loading) {
-        return <p>Loading sets...</p>;
+        return <p className='page'>Loading sets...</p>;
     }
 
     if (selectedSet && mode === 'scorekeeper') {
@@ -79,7 +79,7 @@ function MatchDetail({ match, onBack }) {
             ? Math.max(...sets.map((s) => s.set_number)) + 1
             : 1;
 
-            const response = await fetch (`http://localhost:3001/api/matches/${currentMatch.id}/sets`, {
+            const response = await fetch (`${import.meta.env.VITE_API_URL}/api/matches/${currentMatch.id}/sets`, {
                 method: 'POST',
                 headers: {'Content-Type' : 'application/json' },
                 body: JSON.stringify({ set_number : nextNumber })
@@ -105,7 +105,7 @@ function MatchDetail({ match, onBack }) {
             return;
         }
         try {
-            await fetch(`http://localhost:3001/api/sets/${setId}`, {
+            await fetch(`${import.meta.env.VITE_API_URL}/api/sets/${setId}`, {
                 method: 'DELETE'
             });
             setSets(sets.filter((s) => s.id !== setId));
@@ -116,27 +116,35 @@ function MatchDetail({ match, onBack }) {
 
 
     return (
-        <div>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            <button onClick={onBack}>← Back to matches</button>
-        <h1>{currentMatch.opponent}</h1>
-        <p>{new Date(currentMatch.date).toLocaleDateString()} - {currentMatch.status}</p>
+        <div className='page'>
+            {error && <p className='error-banner'>{error}</p>}
+            <button className='btn-back' onClick={onBack}>← Back to matches</button>
+            <h1 className='app-title'>{currentMatch.opponent}</h1>
+            <p className='scoreboard-status' style={{ textAlign: 'center', marginBottom: 20 }}>
+                {new Date(currentMatch.date).toLocaleDateString()} - {currentMatch.status}
+            </p>
 
-        <h2>Sets</h2>
-        {currentMatch.status !== 'completed' && (
-            <button onClick={handleCreateSet}>+ New Set</button>
-        )}
-        <ul>
-            {sets.map((set) => (
-                <li key={set.id}>
-                    Set {set.set_number}: {set.our_score} - {set.opponent_score} ({set.status})
-                    <button onClick={() => { setSelectedSet(set); setMode('scorekeeper'); }}>Score</button>
-                    <button onClick={() => { setSelectedSet(set); setMode('viewer'); }}>View</button>
-                    <button onClick={() => handleDeleteSet(set.id)}>Delete</button>
-                </li>
-            ))}
-        </ul>
-    </div>
+            <h2 className='section-label'>Sets</h2>
+            {currentMatch.status !== 'completed' && (
+                <button className='btn btn-primary btn-block' onClick={handleCreateSet}>+ New Set</button>
+            )}
+        
+            <div style={{ marginTop: 12}}>
+                {sets.map((set) => (
+                    <div key={set.id} className='card'>
+                        <div className='card-main'>
+                            <div className='card-title'>Set {set.set_number}</div>
+                            <div className='card-sub'>{set.our_score} - {set.opponent_score} ({set.status})</div>
+                        </div>
+                        <div className='btn-group'>
+                            <button className='btn' onClick={() => { setSelectedSet(set); setMode('scorekeeper'); }}>Score</button>
+                            <button className='btn' onClick={() => { setSelectedSet(set); setMode('viewer'); }}>View</button>
+                            <button className='btn btn-danger' onClick={() => handleDeleteSet(set.id)}>Delete</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 
